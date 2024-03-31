@@ -4,28 +4,34 @@
 #include <IRremote.h>
 
 LiquidCrystal_I2C LCD_EKRAN(0x27, 16, 2);
-IRrecv irrecv(52);  //IR alıcının data pini
+IRrecv irrecv(3);  //IR alıcının data pini
 decode_results results;
 
 // Araba var mı yok mu sensörleri pinleri
-#define A_BLOK_ARABA_1 22
-#define A_BLOK_ARABA_2 24
-#define A_BLOK_ARABA_3 26
-#define B_BLOK_ARABA_1 28
-#define B_BLOK_ARABA_2 30
-#define B_BLOK_ARABA_3 32
+#define A_BLOK_ARABA_1 38
+#define A_BLOK_ARABA_2 40
+#define A_BLOK_ARABA_3 42
+#define B_BLOK_ARABA_1 46
+#define B_BLOK_ARABA_2 48
+#define B_BLOK_ARABA_3 50
+
 #define MAKSIMUM_ARABA_SAYISI 6
 
+#define YANGIN_PIN 24
+#define BUZZER 26
+#define LDR_PIN 30
+#define LED_PIN 32
 
 #define GIRIS_SERVO_PIN 7
-#define CIKIS_SERVO_PIN 9
-#define GIRIS_KAPI 11
-#define CIKIS_KAPI 13
+#define CIKIS_SERVO_PIN 8
+#define GIRIS_KAPI 10
+#define CIKIS_KAPI 11
 int mevcutArabaSayisi = 0;
 
 Servo girisServoMotor;
 Servo cikisServoMotor;
 
+String ISIK_DURUM = "OTOMATIK";  // OTOMATIK AÇIK KAPALI
 
 
 void setup() {
@@ -44,6 +50,15 @@ void setup() {
   pinMode(GIRIS_KAPI, INPUT);
   pinMode(CIKIS_KAPI, INPUT);
 
+  // Buzzer Çıkış olarak tanımla
+  pinMode(BUZZER, OUTPUT);
+
+  // Led Pin
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(LDR_PIN, INPUT);
+
+  pinMode(YANGIN_PIN, INPUT);
+
   // Giriş ve çıkış kapıları servo motorlarını pinleri tanımlanmıştır.
   girisServoMotor.attach(GIRIS_SERVO_PIN);
   cikisServoMotor.attach(CIKIS_SERVO_PIN);
@@ -52,7 +67,9 @@ void setup() {
   cikisServoMotor.write(0);
 }
 void loop() {
+  IsikKontrol();
   IR_Oku();
+  YanginKontrol();
   ArabaSayisiHesapla();
   if (mevcutArabaSayisi == MAKSIMUM_ARABA_SAYISI) {
     // Otopark da boş yer yoktur, doludur.
@@ -101,57 +118,51 @@ void ArabaSayisiHesapla() {
   mevcutArabaSayisi = geciciSayi;
 }
 
+
 void IR_Oku() {
   if (irrecv.decode(&results)) {
     //Eğer tuşa basıldığı algılandıysa
-    if (results.value == 0xFFA25D) {
+    if (results.value == 0xFFA25D) { //1 Tuşu
+      ISIK_DURUM="ACIK";
       Serial.println("1");
-    } else if (results.value == 0xFF629D) {
+    } else if (results.value == 0xFF629D) {//2 Tuşu
+      ISIK_DURUM="KAPALI";
       Serial.println("2");
-    } else if (results.value == 0xFFE21D) {
+    } else if (results.value == 0xFFE21D) {//3 Tuşu
+      ISIK_DURUM="OTOMATIK";
       Serial.println("3");
-    }
-    else if (results.value == 0xFF22DD) {
+    } else if (results.value == 0xFF22DD) {//4 Tuşu
       Serial.println("4");
-    }
-    else if (results.value == 0xFF02FD) {
+    } else if (results.value == 0xFF02FD) {//5 Tuşu
       Serial.println("5");
-    }
-    else if (results.value == 0xFFC23D) {
+    } else if (results.value == 0xFFC23D) {//6 Tuşu
       Serial.println("6");
-    }
-    else if (results.value == 0xFFE01F) {
+    } else if (results.value == 0xFFE01F) {//7 Tuşu
       Serial.println("7");
-    }
-    else if (results.value == 0xFFA857) {
+    } else if (results.value == 0xFFA857) {//8 Tuşu
       Serial.println("8");
-    }
-    else if (results.value == 0xFF906F) {
+    } else if (results.value == 0xFF906F) {//9 Tuşu
       Serial.println("9");
-    }
-    else if (results.value == 0xFF6897) {
+    } else if (results.value == 0xFF6897) {//* Tuşu
       Serial.println("*");
-    }
-    else if (results.value == 0xFF9867) {
+    } else if (results.value == 0xFF9867) {//0 Tuşu
       Serial.println("0");
-    }
-    else if (results.value == 0xFFB04F) {
+    } else if (results.value == 0xFFB04F) {//# Tuşu
       Serial.println("#");
-    }
-     else if (results.value == 0xFF18E7) {
+    } else if (results.value == 0xFF18E7) {//Yukarı Tuşu
       Serial.println("Yukarı");
-    }
-    else if (results.value == 0xFF10EF) {
+      GirisKapiAc();
+    } else if (results.value == 0xFF10EF) {//Sol Tuşu
       Serial.println("Sol");
-    }
-    else if (results.value == 0xFF38C7) {
+      CikisKapiAc();
+    } else if (results.value == 0xFF38C7) {//Ok Tuşu
       Serial.println("OK");
-    }
-    else if (results.value == 0xFF5AA5) {
+    } else if (results.value == 0xFF5AA5) {//Sağ Tuşu
       Serial.println("Sağ");
-    }
-    else if (results.value == 0xFF4AB5) {
+      CikisKapiKapat();
+    } else if (results.value == 0xFF4AB5) { // Aşağı Tuşu
       Serial.println("Aşağı");
+      GirisKapiKapat();
     }
     // Serial.println(results.value, HEX);
     //Seri ekranda hex formatta bu adresi yazdır.
@@ -225,4 +236,62 @@ void EkranBosYaz() {
   int bosYerSayisi = MAKSIMUM_ARABA_SAYISI - mevcutArabaSayisi;
   LCD_EKRAN.print(bosYerSayisi);
   LCD_EKRAN.print(" ARAC GIREBILIR");
+}
+void YanginKontrol() {
+  // ILK ONCE YANGIN SENSORUNDEN DEGER OKUYORUZ
+  // OKUDUĞUMUZ DEĞER 0 OLDUĞUNDA YANGIN VAR DEMEKTİR
+  int yanginSensor = digitalRead(YANGIN_PIN);
+  if (yanginSensor == 0) { // YANGIN VARSA
+    
+    // LCD Ekrana ALARM YAZILARINI YAZ
+    LCD_EKRAN.setCursor(0, 0);
+    LCD_EKRAN.print("!!!  ALARM  !!!!");
+    LCD_EKRAN.setCursor(0, 1);
+    LCD_EKRAN.print("!! YANGIN VAR !!");
+
+    digitalWrite(BUZZER, 1);  // Buzzer çalıştır
+
+    // Her iki kapıyı da aynı anda aç
+    for (int i = 0; i <= 90; i++) {
+      cikisServoMotor.write(i);
+      girisServoMotor.write(i);
+      delay(15);
+    }
+
+    // YANGIN SENSORU 0 VERDİĞİ SÜRECE BEKLE
+    
+    while (digitalRead(YANGIN_PIN) == 0) {
+      delay(100); // YANGIN OLDUĞU SÜRECE KOD BURADA SONSUZ DÖNGÜDE KALIYOR
+    }
+    // YANGIN OLMAZSA ILERLE
+    
+    // BUZZER KAPAT
+    digitalWrite(BUZZER, 0);
+
+    // Kapıları kapat
+    for (int i = 90; i >= 0; i--) {
+      cikisServoMotor.write(i);
+      girisServoMotor.write(i);
+      delay(15);
+    }
+  }
+}
+void IsikKontrol() {
+  // ISIK DURUM AÇIKSA LEDİ AÇ
+  // ISIK DURUM KAPALIYSA LEDİ KAPAT
+  // ISIK DURUM OTOMATIK İSE LDR DEN DEĞER OKU
+  // OKUDUĞUN DEĞERE BAK KARANLIKTA LEDİ AÇ
+  // AYDINLIKTA KAPAT
+  if (ISIK_DURUM == "ACIK") {
+    digitalWrite(LED_PIN, 1);
+  } else if (ISIK_DURUM == "KAPALI") {
+    digitalWrite(LED_PIN, 0);
+  } else if (ISIK_DURUM == "OTOMATIK") {
+    int ldr = digitalRead(LDR_PIN);
+    if (ldr == 1) { // KARANLIK
+      digitalWrite(LED_PIN, 1);
+    } else { // AYDINLIK
+      digitalWrite(LED_PIN, 0);
+    }
+  }
 }
